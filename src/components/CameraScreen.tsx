@@ -1,4 +1,4 @@
-import { Camera, X } from 'lucide-react';
+import { Camera, X, RotateCcw } from 'lucide-react';
 import type { CameraMode, FaceBox } from '../types';
 
 interface CameraScreenProps {
@@ -8,9 +8,11 @@ interface CameraScreenProps {
   faceBox: FaceBox | null;
   statusMessage: string;
   isScanning: boolean;
+  facingMode?: 'user' | 'environment';
   onClose: () => void;
   onCapture: () => void;
   onRecognize: () => void;
+  onSwitchCamera?: () => void;
 }
 
 export const CameraScreen = ({
@@ -20,9 +22,11 @@ export const CameraScreen = ({
   faceBox,
   statusMessage,
   isScanning,
+  facingMode = 'user',
   onClose,
   onCapture,
   onRecognize,
+  onSwitchCamera,
 }: CameraScreenProps) => {
   return (
     <div className="min-h-screen bg-black relative">
@@ -31,7 +35,7 @@ export const CameraScreen = ({
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 w-full h-full object-contain bg-black scale-x-[-1]"
+        className={`absolute inset-0 w-full h-full object-contain bg-black ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
       />
       <canvas ref={canvasRef} className="hidden" />
 
@@ -46,7 +50,15 @@ export const CameraScreen = ({
           <div className="text-white font-semibold text-lg">
             {statusMessage || (cameraMode === 'recognize' ? 'Recognize Person' : 'Take Photo')}
           </div>
-          <div className="w-12"></div>
+          {onSwitchCamera && (
+            <button 
+              onClick={onSwitchCamera}
+              className="bg-white bg-opacity-20 backdrop-blur-sm text-white p-3 rounded-full hover:bg-opacity-30 transition"
+            >
+              <RotateCcw className="w-6 h-6" />
+            </button>
+          )}
+          {!onSwitchCamera && <div className="w-12"></div>}
         </div>
 
         {/* Dynamic Face Tracking Box with Name */}

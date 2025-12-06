@@ -26,7 +26,7 @@ const SiltaMVP = () => {
   });
 
   const modelsLoaded = useModels();
-  const { cameraStream, cameraMode, videoRef, startCamera, stopCamera } = useCamera();
+  const { cameraStream, cameraMode, facingMode, videoRef, startCamera, stopCamera, switchCamera } = useCamera();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
   const { faceBox } = useFaceDetection(
@@ -145,9 +145,11 @@ const SiltaMVP = () => {
         faceBox={faceBox}
         statusMessage={statusMessage}
         isScanning={isScanning}
+        facingMode={facingMode}
         onClose={handleCameraClose}
         onCapture={handleCapture}
         onRecognize={handleRecognize}
+        onSwitchCamera={switchCamera}
       />
     );
   }
