@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import * as faceapi from 'face-api.js';
 import { createImageFromBase64 } from '../utils/imageUtils';
-import type { NewProfile } from '../types';
 
 export const useProfileCapture = () => {
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
