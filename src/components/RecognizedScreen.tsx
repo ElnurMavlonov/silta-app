@@ -31,8 +31,14 @@ export const RecognizedScreen = ({ recognizedPerson, onHome, onScanAnother }: Re
           </div>
         </div>
 
-        <h2 className="text-5xl md:text-6xl font-bold mb-4 text-center">{recognizedPerson.name}</h2>
-        <p className="text-3xl text-green-100 mb-12">{recognizedPerson.relationship}</p>
+        <div className="flex items-center justify-center gap-2 mb-12">
+          <div className="bg-teal-500 bg-opacity-50 text-white text-2xl md:text-3xl font-semibold px-6 py-3 rounded shadow-md">
+            {recognizedPerson.name}
+          </div>
+          <div className="bg-sky-400 bg-opacity-50 text-white text-xl md:text-2xl font-semibold px-5 py-3 rounded shadow-md">
+            {recognizedPerson.relationship}
+          </div>
+        </div>
 
         {recognizedPerson.notes && (
           <div className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 max-w-xl w-full">

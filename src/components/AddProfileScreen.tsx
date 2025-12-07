@@ -4,6 +4,7 @@ import type { NewProfile } from '../types';
 interface AddProfileScreenProps {
   newProfile: NewProfile;
   capturedPhoto: string | null;
+  isEditing?: boolean;
   onBack: () => void;
   onPhotoRemove: () => void;
   onTakePhoto: () => void;
@@ -14,6 +15,7 @@ interface AddProfileScreenProps {
 export const AddProfileScreen = ({
   newProfile,
   capturedPhoto,
+  isEditing = false,
   onBack,
   onPhotoRemove,
   onTakePhoto,
@@ -27,13 +29,15 @@ export const AddProfileScreen = ({
           <button onClick={onBack} className="mr-4 hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <h1 className="text-3xl font-bold">Add New Person</h1>
+          <h1 className="text-3xl font-bold">{isEditing ? 'Edit Person' : 'Add New Person'}</h1>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-4xl mx-auto w-full">
         <div>
-          <label className="block text-gray-700 font-semibold mb-3 text-lg">Photo (Required for AI)</label>
+          <label className="block text-gray-700 font-semibold mb-3 text-lg">
+            Photo {isEditing ? '(Update if needed)' : '(Required for AI)'}
+          </label>
           {capturedPhoto ? (
             <div className="relative w-48 h-48 mx-auto">
               <img src={capturedPhoto} alt="Captured" className="w-full h-full object-cover rounded-2xl" />
@@ -80,10 +84,10 @@ export const AddProfileScreen = ({
 
       <button 
         onClick={onSave}
-        disabled={!newProfile.name || !newProfile.relationship || !newProfile.descriptor}
+        disabled={!newProfile.name || !newProfile.relationship || (!newProfile.descriptor && !isEditing)}
         className="m-6 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-5 rounded-2xl text-xl disabled:opacity-50"
       >
-        Save Person
+        {isEditing ? 'Update Person' : 'Save Person'}
       </button>
     </div>
   );

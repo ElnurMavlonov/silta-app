@@ -17,6 +17,7 @@ const SiltaMVP = () => {
   const [screen, setScreen] = useState<Screen>('home');
   const [recognizedPerson, setRecognizedPerson] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [editingProfileId, setEditingProfileId] = useState<number | null>(null);
   const [newProfile, setNewProfile] = useState<NewProfile>({ 
     name: '', 
     relationship: '', 
@@ -86,19 +87,60 @@ const SiltaMVP = () => {
   };
 
   const handleAddProfile = () => {
-    if (newProfile.name && newProfile.relationship && newProfile.descriptor) {
-      const profile: Profile = {
-        id: Date.now(),
-        name: newProfile.name,
-        relationship: newProfile.relationship,
-        notes: newProfile.notes,
-        photo: newProfile.photo,
-        descriptor: newProfile.descriptor
-      };
-      setProfiles([...profiles, profile]);
+    const isEditing = editingProfileId !== null;
+    const hasRequiredFields = newProfile.name && newProfile.relationship;
+    const hasDescriptor = newProfile.descriptor || (isEditing && profiles.find(p => p.id === editingProfileId)?.descriptor);
+    
+    if (hasRequiredFields && hasDescriptor) {
+      if (isEditing) {
+        // Update existing profile
+        const existingProfile = profiles.find(p => p.id === editingProfileId);
+        setProfiles(profiles.map(p => 
+          p.id === editingProfileId 
+            ? {
+                ...p,
+                name: newProfile.name,
+                relationship: newProfile.relationship,
+                notes: newProfile.notes,
+                photo: newProfile.photo || p.photo,
+                descriptor: newProfile.descriptor || p.descriptor
+              }
+            : p
+        ));
+        setEditingProfileId(null);
+      } else {
+        // Add new profile
+        const profile: Profile = {
+          id: Date.now(),
+          name: newProfile.name,
+          relationship: newProfile.relationship,
+          notes: newProfile.notes,
+          photo: newProfile.photo,
+          descriptor: newProfile.descriptor!
+        };
+        setProfiles([...profiles, profile]);
+      }
       setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
       resetCapture();
       setScreen('profiles');
+    }
+  };
+
+  const handleEditProfile = (profile: Profile) => {
+    setEditingProfileId(profile.id);
+    setNewProfile({
+      name: profile.name,
+      relationship: profile.relationship,
+      notes: profile.notes,
+      photo: profile.photo,
+      descriptor: profile.descriptor
+    });
+    setScreen('add-profile');
+  };
+
+  const handleDeleteProfile = (profileId: number) => {
+    if (window.confirm('Are you sure you want to delete this person?')) {
+      setProfiles(profiles.filter(p => p.id !== profileId));
     }
   };
 
@@ -148,7 +190,6 @@ const SiltaMVP = () => {
         facingMode={facingMode}
         onClose={handleCameraClose}
         onCapture={handleCapture}
-        onRecognize={handleRecognize}
         onSwitchCamera={switchCamera}
       />
     );
@@ -169,7 +210,13 @@ const SiltaMVP = () => {
       <ProfilesScreen
         profiles={profiles}
         onHome={() => setScreen('home')}
-        onAddProfile={() => setScreen('add-profile')}
+        onAddProfile={() => {
+          setEditingProfileId(null);
+          setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
+          setScreen('add-profile');
+        }}
+        onEditProfile={handleEditProfile}
+        onDeleteProfile={handleDeleteProfile}
       />
     );
   }
@@ -178,8 +225,14 @@ const SiltaMVP = () => {
     return (
       <AddProfileScreen
         newProfile={newProfile}
-        capturedPhoto={capturedPhoto}
-        onBack={() => setScreen('profiles')}
+        capturedPhoto={capturedPhoto || newProfile.photo}
+        isEditing={editingProfileId !== null}
+        onBack={() => {
+          setEditingProfileId(null);
+          setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
+          resetCapture();
+          setScreen('profiles');
+        }}
         onPhotoRemove={handlePhotoRemove}
         onTakePhoto={handleTakePhoto}
         onProfileChange={handleProfileChange}

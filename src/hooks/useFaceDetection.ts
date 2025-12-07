@@ -49,6 +49,9 @@ export const useFaceDetection = (
 
             // Recognition Logic
             let labelText = "Unrecognized";
+            let personName: string | undefined;
+            let personRelationship: string | undefined;
+            let personNotes: string | undefined;
             let boxColor = "border-red-500 shadow-red-500/50";
             let badgeColor = "bg-red-500";
 
@@ -58,7 +61,10 @@ export const useFaceDetection = (
                 const matchId = parseInt(bestMatch.label);
                 const person = profiles.find(p => p.id === matchId);
                 if (person) {
-                  labelText = person.name;
+                  labelText = `${person.name}: ${person.relationship}`;
+                  personName = person.name;
+                  personRelationship = person.relationship;
+                  personNotes = person.notes;
                   boxColor = "border-green-500 shadow-green-500/50";
                   badgeColor = "bg-green-500";
                 }
@@ -80,6 +86,9 @@ export const useFaceDetection = (
               width: scaledWidth,
               height: box.height * ratioY,
               label: labelText,
+              name: personName,
+              relationship: personRelationship,
+              notes: personNotes,
               color: boxColor,
               badge: badgeColor
             });

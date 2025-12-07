@@ -21,6 +21,9 @@ export interface FaceBox {
   width: number;
   height: number;
   label: string;
+  name?: string;
+  relationship?: string;
+  notes?: string;
   color: string;
   badge: string;
 }
