@@ -8,14 +8,12 @@ import { useProfileCapture } from './hooks/useProfileCapture';
 import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './components/HomeScreen';
 import { CameraScreen } from './components/CameraScreen';
-import { RecognizedScreen } from './components/RecognizedScreen';
 import { ProfilesScreen } from './components/ProfilesScreen';
 import { AddProfileScreen } from './components/AddProfileScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 
 const SiltaMVP = () => {
   const [screen, setScreen] = useState<Screen>('home');
-  const [recognizedPerson, setRecognizedPerson] = useState<Profile | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [editingProfileId, setEditingProfileId] = useState<number | null>(null);
   const [newProfile, setNewProfile] = useState<NewProfile>({ 
@@ -39,8 +37,7 @@ const SiltaMVP = () => {
 
   const { 
     isScanning, 
-    statusMessage: recognitionStatus, 
-    performRecognition 
+    statusMessage: recognitionStatus
   } = useFaceRecognition(profiles);
 
   const {
@@ -77,15 +74,6 @@ const SiltaMVP = () => {
     );
   };
 
-  const handleRecognize = async () => {
-    if (!videoRef.current) return;
-    await performRecognition(videoRef.current, (person) => {
-      setRecognizedPerson(person);
-      stopCamera();
-      setScreen('recognized');
-    });
-  };
-
   const handleAddProfile = () => {
     const isEditing = editingProfileId !== null;
     const hasRequiredFields = newProfile.name && newProfile.relationship;
@@ -94,7 +82,6 @@ const SiltaMVP = () => {
     if (hasRequiredFields && hasDescriptor) {
       if (isEditing) {
         // Update existing profile
-        const existingProfile = profiles.find(p => p.id === editingProfileId);
         setProfiles(profiles.map(p => 
           p.id === editingProfileId 
             ? {
@@ -158,11 +145,6 @@ const SiltaMVP = () => {
     setNewProfile(prev => ({ ...prev, ...updates }));
   };
 
-  const handleScanAnother = () => {
-    setScreen('camera');
-    startCamera('recognize');
-  };
-
   if (!modelsLoaded) {
     return <LoadingScreen />;
   }
@@ -191,16 +173,6 @@ const SiltaMVP = () => {
         onClose={handleCameraClose}
         onCapture={handleCapture}
         onSwitchCamera={switchCamera}
-      />
-    );
-  }
-
-  if (screen === 'recognized' && recognizedPerson) {
-    return (
-      <RecognizedScreen
-        recognizedPerson={recognizedPerson}
-        onHome={() => setScreen('home')}
-        onScanAnother={handleScanAnother}
       />
     );
   }
