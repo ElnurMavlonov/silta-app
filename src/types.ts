@@ -28,6 +28,12 @@ export interface FaceBox {
   badge: string;
 }
 
-export type Screen = 'home' | 'camera' | 'recognized' | 'profiles' | 'add-profile' | 'profile';
-export type CameraMode = 'recognize' | 'capture' | null;
+export interface UserProfile {
+  name: string;
+  photo: string | null;
+  faceDescriptor: Float32Array | null;
+}
+
+export type Screen = 'home' | 'camera' | 'recognized' | 'profiles' | 'add-profile' | 'profile' | 'face-verify' | 'help' | 'settings';
+export type CameraMode = 'recognize' | 'capture' | 'verify' | null;
 

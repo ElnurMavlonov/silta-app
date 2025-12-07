@@ -15,7 +15,7 @@ export const useCamera = () => {
     }
   }, [cameraStream, cameraMode]);
 
-  const startCamera = async (mode: 'recognize' | 'capture', facing: FacingMode = 'user') => {
+  const startCamera = async (mode: CameraMode, facing: FacingMode = 'user') => {
     try {
       // Stop existing stream if any
       if (cameraStream) {
