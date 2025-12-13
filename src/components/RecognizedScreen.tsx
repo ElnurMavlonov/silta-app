@@ -40,8 +40,40 @@ export const RecognizedScreen = ({ recognizedPerson, onHome, onScanAnother }: Re
           </div>
         </div>
 
+        {recognizedPerson.voiceContext && (
+          <div className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 max-w-xl w-full mb-6">
+            <h3 className="text-2xl font-bold mb-4">Voice Analysis</h3>
+            <p className="text-lg leading-relaxed mb-4">{recognizedPerson.voiceContext.description}</p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="opacity-75">Tone:</span> <span className="font-semibold capitalize">{recognizedPerson.voiceContext.tone}</span>
+              </div>
+              <div>
+                <span className="opacity-75">Emotion:</span> <span className="font-semibold capitalize">{recognizedPerson.voiceContext.emotion}</span>
+              </div>
+              <div>
+                <span className="opacity-75">Speed:</span> <span className="font-semibold capitalize">{recognizedPerson.voiceContext.speed}</span>
+              </div>
+              <div>
+                <span className="opacity-75">Volume:</span> <span className="font-semibold capitalize">{recognizedPerson.voiceContext.volume}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {recognizedPerson.lastConversation && (
+          <div className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 max-w-xl w-full mb-6">
+            <h3 className="text-2xl font-bold mb-4">Last Conversation</h3>
+            <p className="text-lg leading-relaxed mb-4">{recognizedPerson.lastConversation.summary}</p>
+            <div className="text-sm opacity-75">
+              {new Date(recognizedPerson.lastConversation.startTime).toLocaleString()}
+            </div>
+          </div>
+        )}
+
         {recognizedPerson.notes && (
           <div className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 max-w-xl w-full">
+            <h3 className="text-2xl font-bold mb-4">Notes</h3>
             <p className="text-xl leading-relaxed">{recognizedPerson.notes}</p>
           </div>
         )}

@@ -9,9 +9,12 @@ interface CameraScreenProps {
   statusMessage: string;
   isScanning: boolean;
   facingMode?: 'user' | 'environment';
+  isRecordingConversation?: boolean;
+  activeSpeakers?: Map<number, number>;
   onClose: () => void;
   onCapture: () => void;
   onSwitchCamera?: () => void;
+  onEndConversation?: () => void;
 }
 
 export const CameraScreen = ({
@@ -22,9 +25,12 @@ export const CameraScreen = ({
   statusMessage,
   isScanning,
   facingMode = 'user',
+  isRecordingConversation = false,
+  activeSpeakers = new Map(),
   onClose,
   onCapture,
   onSwitchCamera,
+  onEndConversation,
 }: CameraScreenProps) => {
   return (
     <div className="min-h-screen bg-black relative">
@@ -45,8 +51,19 @@ export const CameraScreen = ({
           >
             <X className="w-6 h-6" />
           </button>
-          <div className="text-white font-semibold text-lg">
+          <div className="text-white font-semibold text-lg text-center flex-1">
             {statusMessage || (cameraMode === 'recognize' ? 'Recognize Person' : 'Take Photo')}
+            {isRecordingConversation && (
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-xs text-red-200">Recording conversation</span>
+                {activeSpeakers && activeSpeakers.size > 0 && (
+                  <span className="text-xs text-white/70">
+                    ({activeSpeakers.size} speaker{activeSpeakers.size > 1 ? 's' : ''})
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           {onSwitchCamera && (
             <button 
@@ -120,16 +137,27 @@ export const CameraScreen = ({
           </div>
         )}
 
-        <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-4 px-6">
-          {cameraMode === 'recognize' ? (
-            <button 
-              onClick={onCapture}
-              disabled={isScanning || !faceBox || !!faceBox.name}
-              className="bg-purple-600 text-white font-bold px-12 py-5 rounded-full text-xl hover:bg-purple-700 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isScanning ? 'Scanning...' : 'Add Person'}
-            </button>
-          ) : (
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-4 px-6">
+          {cameraMode === 'recognize' && (
+            <div className="flex gap-4 w-full max-w-md">
+              {isRecordingConversation && onEndConversation && (
+                <button 
+                  onClick={onEndConversation}
+                  className="bg-red-600 text-white font-bold px-8 py-4 rounded-full text-lg hover:bg-red-700 transition active:scale-95 flex-1"
+                >
+                  End Conversation
+                </button>
+              )}
+              <button 
+                onClick={onCapture}
+                disabled={isScanning || !faceBox || !!faceBox.name}
+                className="bg-purple-600 text-white font-bold px-12 py-5 rounded-full text-xl hover:bg-purple-700 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex-1"
+              >
+                {isScanning ? 'Scanning...' : 'Add Person'}
+              </button>
+            </div>
+          )}
+          {cameraMode !== 'recognize' && (
             <button 
               onClick={onCapture}
               className="bg-white text-purple-700 font-bold p-6 rounded-full hover:bg-gray-100 transition active:scale-95"

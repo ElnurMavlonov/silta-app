@@ -1,12 +1,13 @@
-import { Camera, Home, Users, User } from 'lucide-react';
+import { Camera, Home, Users, User, Mic } from 'lucide-react';
 
 interface HomeScreenProps {
   onRecognizeClick: () => void;
+  onVoiceRecognizeClick: () => void;
   onProfilesClick: () => void;
   onProfileClick: () => void; // Assuming this leads to a user settings profile
 }
 
-export const HomeScreen = ({ onRecognizeClick, onProfilesClick, onProfileClick }: HomeScreenProps) => {
+export const HomeScreen = ({ onRecognizeClick, onVoiceRecognizeClick, onProfilesClick, onProfileClick }: HomeScreenProps) => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-indigo-700 text-white">
       {/* Header */}
@@ -17,16 +18,29 @@ export const HomeScreen = ({ onRecognizeClick, onProfilesClick, onProfileClick }
 
       {/* Main Content Area */}
       <div className="flex-1 px-6 py-8 space-y-4 max-w-2xl mx-auto w-full flex flex-col justify-center">
-        {/* Recognize Button - Now centered and solo */}
-        <div 
-          onClick={onRecognizeClick}
-          className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 text-center cursor-pointer hover:bg-opacity-30 transition-all active:scale-95 shadow-xl"
-        >
-          <div className="w-32 h-32 bg-white bg-opacity-30 rounded-full mx-auto mb-6 flex items-center justify-center">
-            <Camera className="w-16 h-16" />
+        {/* Recognize Buttons */}
+        <div className="space-y-4">
+          <div 
+            onClick={onRecognizeClick}
+            className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 text-center cursor-pointer hover:bg-opacity-30 transition-all active:scale-95 shadow-xl"
+          >
+            <div className="w-32 h-32 bg-white bg-opacity-30 rounded-full mx-auto mb-6 flex items-center justify-center">
+              <Camera className="w-16 h-16" />
+            </div>
+            <h2 className="text-4xl font-bold mb-3">Recognize Face</h2>
+            <p className="text-purple-100 text-xl">Point camera at a person's face</p>
           </div>
-          <h2 className="text-4xl font-bold mb-3">Recognize Someone</h2>
-          <p className="text-purple-100 text-xl">Point camera at a person's face</p>
+
+          <div 
+            onClick={onVoiceRecognizeClick}
+            className="bg-white bg-opacity-20 backdrop-blur-lg rounded-3xl p-8 text-center cursor-pointer hover:bg-opacity-30 transition-all active:scale-95 shadow-xl"
+          >
+            <div className="w-32 h-32 bg-white bg-opacity-30 rounded-full mx-auto mb-6 flex items-center justify-center">
+              <Mic className="w-16 h-16" />
+            </div>
+            <h2 className="text-4xl font-bold mb-3">Recognize Voice</h2>
+            <p className="text-purple-100 text-xl">Listen to someone say "hello"</p>
+          </div>
         </div>
       </div>
 

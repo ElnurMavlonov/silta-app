@@ -1,11 +1,14 @@
 import { useState, useRef } from 'react';
 import * as faceapi from 'face-api.js';
-import type { Screen, Profile, NewProfile, UserProfile } from './types';
+import type { Screen, Profile, NewProfile, UserProfile, VoiceContext } from './types';
 import { useModels } from './hooks/useModels';
 import { useCamera } from './hooks/useCamera';
 import { useFaceDetection } from './hooks/useFaceDetection';
 import { useFaceRecognition } from './hooks/useFaceRecognition';
 import { useProfileCapture } from './hooks/useProfileCapture';
+import { useVoiceRecognition } from './hooks/useVoiceRecognition';
+import { useVoiceCapture } from './hooks/useVoiceCapture';
+import { useConversationRecording } from './hooks/useConversationRecording';
 import { LoadingScreen } from './components/LoadingScreen';
 import { HomeScreen } from './components/HomeScreen';
 import { CameraScreen } from './components/CameraScreen';
@@ -15,6 +18,8 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { FaceVerificationScreen } from './components/FaceVerificationScreen';
 import { HelpScreen } from './components/HelpScreen';
 import { SettingsScreen } from './components/SettingsScreen';
+import { VoiceRecognitionScreen } from './components/VoiceRecognitionScreen';
+import { VoiceCaptureScreen } from './components/VoiceCaptureScreen';
 
 const SiltaMVP = () => {
   const [screen, setScreen] = useState<Screen>('home');
@@ -41,8 +46,13 @@ const SiltaMVP = () => {
     relationship: '', 
     notes: '', 
     photo: null, 
-    descriptor: null 
+    descriptor: null,
+    voiceFeatures: null,
+    voiceContext: null
   });
+  const [voiceRecognizedPerson, setVoiceRecognizedPerson] = useState<Profile | null>(null);
+  const [voiceSimilarity, setVoiceSimilarity] = useState<number>(0);
+  const [capturedVoiceContext, setCapturedVoiceContext] = useState<VoiceContext | null>(null);
 
   const modelsLoaded = useModels();
   const { cameraStream, cameraMode, facingMode, videoRef, startCamera, stopCamera, switchCamera } = useCamera();
@@ -67,16 +77,174 @@ const SiltaMVP = () => {
     resetCapture,
   } = useProfileCapture();
 
-  const handleRecognizeClick = () => {
+  const {
+    isListening,
+    isProcessing,
+    statusMessage: voiceRecognitionStatus,
+    startListening: startVoiceListening,
+    stopListening: stopVoiceListening,
+    recognizeVoice,
+    recordAudio,
+  } = useVoiceRecognition(
+    profiles, 
+    true, // Auto-start enabled
+    (person, similarity) => {
+      // Auto-recognition callback
+      setVoiceRecognizedPerson(person);
+      setVoiceSimilarity(similarity);
+    }
+  );
+
+  const {
+    isRecording: isVoiceRecording,
+    statusMessage: voiceCaptureStatus,
+    startRecording: startVoiceRecording,
+    stopRecording: stopVoiceRecording,
+    captureAndAnalyzeVoice,
+  } = useVoiceCapture();
+
+  const {
+    isRecording: isConversationRecording,
+    activeSpeakers,
+    startRecording: startConversationRecording,
+    stopRecording: stopConversationRecording,
+  } = useConversationRecording(profiles);
+
+  const handleRecognizeClick = async () => {
     setScreen('camera');
     startCamera('recognize');
+    // Start conversation recording when recognizing - wait a bit for camera to initialize
+    setTimeout(async () => {
+      if (!isConversationRecording) {
+        try {
+          await startConversationRecording();
+          console.log('Conversation recording started');
+        } catch (error) {
+          console.error('Failed to start conversation recording:', error);
+        }
+      }
+    }, 500);
   };
 
   const handleProfilesClick = () => {
     setScreen('profiles');
   };
 
-  const handleCameraClose = () => {
+  const saveConversationToProfiles = async () => {
+    if (isConversationRecording) {
+      console.log('Stopping conversation recording...');
+      const conversation = await stopConversationRecording();
+      if (conversation && conversation.segments.length > 0) {
+        console.log('Saving conversation to profiles:', conversation);
+        
+        // If we have recognized faces, try to match segments to them
+        // Otherwise, save conversation to all profiles that were visible during recording
+        const recognizedProfileIds = profiles
+          .filter(p => p.descriptor !== null)
+          .map(p => p.id);
+        
+        // Update profiles with conversation notes
+        let hasUpdates = false;
+        const updatedProfiles = profiles.map(profile => {
+          // If this profile was a participant, update it
+          if (conversation.participants.includes(profile.id)) {
+            const personSegments = conversation.segments.filter(s => s.speakerId === profile.id);
+            if (personSegments.length > 0) {
+              hasUpdates = true;
+              const updatedHistory = [...(profile.conversationHistory || []), conversation];
+              const conversationNote = `[Last conversation - ${new Date(conversation.startTime).toLocaleString()}]: ${conversation.summary}`;
+              
+              return {
+                ...profile,
+                lastConversation: conversation,
+                conversationHistory: updatedHistory.slice(-10),
+                notes: profile.notes 
+                  ? `${profile.notes}\n\n${conversationNote}`
+                  : conversationNote
+              };
+            }
+          }
+          // If no participants identified but we have segments, save to all recognized profiles
+          if (conversation.participants.length === 0 && recognizedProfileIds.includes(profile.id)) {
+            hasUpdates = true;
+            const updatedHistory = [...(profile.conversationHistory || []), conversation];
+            const conversationNote = `[Last conversation - ${new Date(conversation.startTime).toLocaleString()}]: ${conversation.summary}`;
+            
+            return {
+              ...profile,
+              lastConversation: conversation,
+              conversationHistory: updatedHistory.slice(-10),
+              notes: profile.notes 
+                ? `${profile.notes}\n\n${conversationNote}`
+                : conversationNote
+            };
+          }
+          return profile;
+        });
+        
+        if (hasUpdates) {
+          setProfiles(updatedProfiles);
+          console.log('Profiles updated with conversation');
+          return true;
+        } else {
+          // If we have segments but no matching profiles, save to the first profile with a face descriptor
+          // This handles the case where voice recognition didn't work but we still have conversation
+          if (recognizedProfileIds.length > 0) {
+            const firstRecognizedProfile = profiles.find(p => recognizedProfileIds.includes(p.id));
+            if (firstRecognizedProfile) {
+              const updatedHistory = [...(firstRecognizedProfile.conversationHistory || []), conversation];
+              const conversationNote = `[Last conversation - ${new Date(conversation.startTime).toLocaleString()}]: ${conversation.summary}`;
+              
+              const updatedProfiles2 = profiles.map(p => 
+                p.id === firstRecognizedProfile.id
+                  ? {
+                      ...p,
+                      lastConversation: conversation,
+                      conversationHistory: updatedHistory.slice(-10),
+                      notes: p.notes 
+                        ? `${p.notes}\n\n${conversationNote}`
+                        : conversationNote
+                    }
+                  : p
+              );
+              setProfiles(updatedProfiles2);
+              console.log('Conversation saved to first recognized profile');
+              return true;
+            }
+          }
+          console.log('No matching profiles found, but conversation was recorded');
+          return true; // Still return true since conversation was recorded
+        }
+      } else {
+        console.log('No conversation segments to save');
+        return false;
+      }
+    }
+    return false;
+  };
+
+  const handleEndConversation = async () => {
+    const saved = await saveConversationToProfiles();
+    if (saved) {
+      alert('Conversation saved to profiles!');
+      // Optionally restart recording for next conversation
+      if (!isConversationRecording) {
+        setTimeout(async () => {
+          try {
+            await startConversationRecording();
+          } catch (error) {
+            console.error('Failed to restart conversation recording:', error);
+          }
+        }, 500);
+      }
+    } else {
+      alert('No conversation segments were recorded. Make sure you are speaking and microphone permissions are granted.');
+    }
+  };
+
+  const handleCameraClose = async () => {
+    // Stop conversation recording and save to profiles
+    await saveConversationToProfiles();
     stopCamera();
     setCaptureForUserProfile(false);
     setScreen('home');
@@ -110,7 +278,7 @@ const SiltaMVP = () => {
   const handleAddProfile = () => {
     const isEditing = editingProfileId !== null;
     const hasRequiredFields = newProfile.name && newProfile.relationship;
-    const hasDescriptor = newProfile.descriptor || (isEditing && profiles.find(p => p.id === editingProfileId)?.descriptor);
+    const hasDescriptor = newProfile.descriptor || newProfile.voiceFeatures || (isEditing && (profiles.find(p => p.id === editingProfileId)?.descriptor || profiles.find(p => p.id === editingProfileId)?.voiceFeatures));
     
     if (hasRequiredFields && hasDescriptor) {
       if (isEditing) {
@@ -123,7 +291,9 @@ const SiltaMVP = () => {
                 relationship: newProfile.relationship,
                 notes: newProfile.notes,
                 photo: newProfile.photo || p.photo,
-                descriptor: newProfile.descriptor || p.descriptor
+                descriptor: newProfile.descriptor || p.descriptor,
+                voiceFeatures: newProfile.voiceFeatures || p.voiceFeatures,
+                voiceContext: newProfile.voiceContext || p.voiceContext
               }
             : p
         ));
@@ -136,12 +306,17 @@ const SiltaMVP = () => {
           relationship: newProfile.relationship,
           notes: newProfile.notes,
           photo: newProfile.photo,
-          descriptor: newProfile.descriptor!
+          descriptor: newProfile.descriptor,
+          voiceFeatures: newProfile.voiceFeatures,
+          voiceContext: newProfile.voiceContext,
+          lastConversation: null,
+          conversationHistory: []
         };
         setProfiles([...profiles, profile]);
       }
-      setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
+      setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null, voiceFeatures: null, voiceContext: null });
       resetCapture();
+      setCapturedVoiceContext(null);
       setScreen('profiles');
     }
   };
@@ -180,6 +355,58 @@ const SiltaMVP = () => {
     setNewProfile(prev => ({ ...prev, descriptor: null }));
   };
 
+  const handleVoiceRecognizeClick = () => {
+    setScreen('voice-recognition');
+    setVoiceRecognizedPerson(null);
+    setVoiceSimilarity(0);
+    // Auto-start will be handled by the hook when screen changes
+    if (!isListening && profiles.some(p => p.voiceFeatures)) {
+      startVoiceListening();
+    }
+  };
+
+  const handleVoiceRecognition = async () => {
+    try {
+      const audioBuffer = await recordAudio();
+      const result = await recognizeVoice(audioBuffer, (person, similarity) => {
+        setVoiceRecognizedPerson(person);
+        setVoiceSimilarity(similarity);
+      });
+      if (result.person) {
+        setVoiceRecognizedPerson(result.person);
+        setVoiceSimilarity(result.similarity);
+      }
+    } catch (error) {
+      console.error('Error recognizing voice:', error);
+      alert('Error recognizing voice. Please try again.');
+    }
+  };
+
+
+  const handleVoiceCaptureClick = () => {
+    setScreen('voice-capture');
+    setCapturedVoiceContext(null);
+  };
+
+  const handleVoiceCapture = async () => {
+    await captureAndAnalyzeVoice((features, context) => {
+      setNewProfile(prev => ({ ...prev, voiceFeatures: features, voiceContext: context }));
+      setCapturedVoiceContext(context);
+    });
+  };
+
+  const handleVoiceCaptureClose = () => {
+    stopVoiceRecording();
+    setScreen('add-profile');
+  };
+
+  const handleVoiceRecognitionClose = () => {
+    stopVoiceListening();
+    setVoiceRecognizedPerson(null);
+    setVoiceSimilarity(0);
+    setScreen('home');
+  };
+
   const handleProfileChange = (updates: Partial<NewProfile>) => {
     setNewProfile(prev => ({ ...prev, ...updates }));
   };
@@ -191,7 +418,7 @@ const SiltaMVP = () => {
   const handleClearAllData = () => {
     setProfiles([]);
     setUserProfile({ name: 'User Profile', photo: null, faceDescriptor: null });
-    setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
+    setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null, voiceFeatures: null, voiceContext: null });
     resetCapture();
     setEditingProfileId(null);
     setPendingOperation(null);
@@ -233,7 +460,9 @@ const SiltaMVP = () => {
           relationship: pendingOperation.profile.relationship,
           notes: pendingOperation.profile.notes,
           photo: pendingOperation.profile.photo,
-          descriptor: pendingOperation.profile.descriptor
+          descriptor: pendingOperation.profile.descriptor,
+          voiceFeatures: pendingOperation.profile.voiceFeatures,
+          voiceContext: pendingOperation.profile.voiceContext
         });
         setScreen('add-profile');
       } else if (pendingOperation.type === 'delete' && pendingOperation.profileId) {
@@ -259,6 +488,7 @@ const SiltaMVP = () => {
     return (
       <HomeScreen
         onRecognizeClick={handleRecognizeClick}
+        onVoiceRecognizeClick={handleVoiceRecognizeClick}
         onProfilesClick={handleProfilesClick}
         onProfileClick={() => setScreen('profile')}
       />
@@ -294,9 +524,12 @@ const SiltaMVP = () => {
         statusMessage={statusMessage}
         isScanning={isScanning}
         facingMode={facingMode}
+        isRecordingConversation={isConversationRecording}
+        activeSpeakers={activeSpeakers}
         onClose={handleCameraClose}
         onCapture={handleCapture}
         onSwitchCamera={switchCamera}
+        onEndConversation={handleEndConversation}
       />
     );
   }
@@ -308,7 +541,7 @@ const SiltaMVP = () => {
         onHome={() => setScreen('home')}
         onAddProfile={() => {
           setEditingProfileId(null);
-          setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
+          setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null, voiceFeatures: null, voiceContext: null });
           setScreen('add-profile');
         }}
         onEditProfile={handleEditProfile}
@@ -325,12 +558,14 @@ const SiltaMVP = () => {
         isEditing={editingProfileId !== null}
         onBack={() => {
           setEditingProfileId(null);
-          setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null });
+          setNewProfile({ name: '', relationship: '', notes: '', photo: null, descriptor: null, voiceFeatures: null, voiceContext: null });
           resetCapture();
+          setCapturedVoiceContext(null);
           setScreen('profiles');
         }}
         onPhotoRemove={handlePhotoRemove}
         onTakePhoto={handleTakePhoto}
+        onVoiceCaptureClick={handleVoiceCaptureClick}
         onProfileChange={handleProfileChange}
         onSave={handleAddProfile}
       />
@@ -374,6 +609,43 @@ const SiltaMVP = () => {
     return (
       <HelpScreen
         onBack={() => setScreen('profile')}
+      />
+    );
+  }
+
+  if (screen === 'voice-recognition') {
+    return (
+      <VoiceRecognitionScreen
+        isListening={isListening}
+        isProcessing={isProcessing}
+        statusMessage={voiceRecognitionStatus}
+        recognizedPerson={voiceRecognizedPerson}
+        similarity={voiceSimilarity}
+        onClose={handleVoiceRecognitionClose}
+        onStartListening={startVoiceListening}
+        onStopListening={stopVoiceListening}
+        onRecognize={handleVoiceRecognition}
+        onRecognizeAnother={() => {
+          setVoiceRecognizedPerson(null);
+          setVoiceSimilarity(0);
+          if (!isListening) {
+            startVoiceListening();
+          }
+        }}
+      />
+    );
+  }
+
+  if (screen === 'voice-capture') {
+    return (
+      <VoiceCaptureScreen
+        isRecording={isVoiceRecording}
+        statusMessage={voiceCaptureStatus}
+        voiceContext={capturedVoiceContext}
+        onClose={handleVoiceCaptureClose}
+        onStartRecording={startVoiceRecording}
+        onStopRecording={stopVoiceRecording}
+        onCapture={handleVoiceCapture}
       />
     );
   }

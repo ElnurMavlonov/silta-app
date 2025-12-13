@@ -15,9 +15,12 @@ export const useFaceDetection = (
   // PERFORMANCE: Only rebuild the matcher when profiles change, not every frame
   const faceMatcher = useMemo(() => {
     if (profiles.length === 0) return null;
-    const labeledDescriptors = profiles.map(p => 
-      new faceapi.LabeledFaceDescriptors(p.id.toString(), [p.descriptor!])
-    );
+    const labeledDescriptors = profiles
+      .filter(p => p.descriptor !== null)
+      .map(p => 
+        new faceapi.LabeledFaceDescriptors(p.id.toString(), [p.descriptor!])
+      );
+    if (labeledDescriptors.length === 0) return null;
     return new faceapi.FaceMatcher(labeledDescriptors, 0.6);
   }, [profiles]);
 
@@ -27,7 +30,7 @@ export const useFaceDetection = (
     if (cameraMode === 'recognize' && cameraStream && videoRef.current) {
       interval = setInterval(async () => {
         // PERFORMANCE: If still thinking about the last frame, skip this one
-        if (isProcessing.current || !videoRef.current || videoRef.current.paused) return;
+        if (isProcessing.current || !videoRef.current || videoRef.current.paused || videoRef.current.readyState < 2) return;
         
         isProcessing.current = true; // Lock
 
@@ -105,8 +108,11 @@ export const useFaceDetection = (
       setFaceBox(null);
     }
 
-    return () => clearInterval(interval);
-  }, [cameraMode, cameraStream, faceMatcher]); // Removed 'profiles' dependency (handled by useMemo)
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraMode, cameraStream, faceMatcher]); // 'profiles' handled by useMemo, 'videoRef' is stable
 
   return { faceBox };
 };
